@@ -1,31 +1,19 @@
 /* eslint-disable no-console */
-
-const _ = require('lodash');
+const fs = require('fs');
 const axios = require('axios');
+const dotent = require('dotenv');
 const prompts = require('prompts');
+const mysqlssh = require('mysql-ssh');
 const { Spinner } = require('cli-spinner');
 
-const apiVersion = '3.0';
-const selectable = [
-  {
-    title: 'XXX list',
-    value: {
-      apikey: 'sfirti94jnvfjklb493rjkgoka058f73-us13',
-    },
-  }, // XXX list
-];
-
-selectable.forEach((item) => {
-  // eslint-disable-next-line no-param-reassign
-  item.value.name = item.title;
-});
+dotent.config();
 
 const makeMailChimpRequester = apikey => axios.create({
   auth: {
     username: 'none',
     password: apikey,
   },
-  baseURL: `https://${apikey.split('-')[1]}.api.mailchimp.com/${apiVersion}/`,
+  baseURL: `https://${apikey.split('-')[1]}.api.mailchimp.com/3.0/`,
 });
 
 module.exports = {
@@ -33,13 +21,52 @@ module.exports = {
     const q = i.toLowerCase();
     return Promise.resolve(i.length ? c.filter(data => data.title.toLowerCase().includes(q)) : c);
   },
+  fetchCustomerFromDB: async () => {
+    const spinner = new Spinner('Fetching customers...');
+    spinner.start();
+    const lists = [];
+
+    const dbCon = await mysqlssh.connect(
+      {
+        port: process.env.SSH_PORT,
+        host: process.env.SSH_HOST,
+        user: process.env.SSH_USER,
+        passphrase: process.env.SSH_KEY_PASS,
+        privateKey: fs.readFileSync(process.env.SSH_KEY_FILE),
+      },
+      {
+        port: process.env.SSH_DB_PORT,
+        host: 'localhost',
+        user: process.env.SSH_DB_USER,
+        password: process.env.SSH_DB_PASS,
+        database: process.env.SSH_DB_DB,
+      },
+    );
+
+    const [results] = await dbCon.query('SELECT name, espAPIKey FROM `Accounts` WHERE active = 1 AND espName = "mailchimp"');
+
+    results.forEach((item) => {
+      lists.push({
+        title: item.name,
+        value: {
+          name: item.name,
+          apikey: item.espAPIKey,
+        },
+      });
+    });
+
+    mysqlssh.close();
+    spinner.stop();
+
+    return lists;
+  },
   customerSelector: async skipConfirm => prompts([
     {
       type: 'autocomplete',
       name: 'customer',
       limit: 0,
       message: 'Which customer?',
-      choices: selectable,
+      choices: module.exports.fetchCustomerFromDB,
       suggest: module.exports.searchTitle,
     },
     {
@@ -74,7 +101,7 @@ module.exports = {
           process.exit(-1);
         }
 
-        _.each(data.lists, (list) => {
+        data.lists.forEach((list) => {
           lists.push({
             title: list.name,
             value: {
@@ -103,7 +130,7 @@ module.exports = {
       name: 'customer',
       limit: 0,
       message: 'Which customer?',
-      choices: selectable,
+      choices: module.exports.fetchCustomerFromDB,
       suggest: module.exports.searchTitle,
     },
     {

@@ -11,14 +11,13 @@ const { waterfall, each } = require('async');
 const { customerSelector } = require('./promot-customer-selector');
 
 const filePath = process.argv[2];
+const fileName = path.basename(filePath, path.extname(filePath));
+const fileLocation = path.dirname(filePath);
 
 if (typeof filePath === 'undefined') {
   console.error('no input file');
   process.exit(-1);
 }
-
-const fileName = path.basename(filePath, path.extname(filePath));
-const fileLocation = path.dirname(filePath);
 
 const statusList = ['subscribed', 'unsubscribed', 'cleaned'].reverse();
 
@@ -118,11 +117,16 @@ waterfall([
     filterStatus.push('new', 'fail');
     const parser = new Parser();
     each(filterStatus, (subscriberStatus, eachCb) => {
-      const savedFile = `${fileLocation}/${fileName}_${subscriberStatus}_results.csv`;
       const records = exportDb.chain().find({ subscriberStatus }).data({ removeMeta: true });
-      fs.writeFile(savedFile, parser.parse(records), (e) => {
-        eachCb(e);
-      });
+      if (records.length) {
+        const savedFile = `${fileLocation}/${fileName}_${subscriberStatus}_results.csv`;
+        fs.writeFile(savedFile, parser.parse(records), (e) => {
+          eachCb(e);
+        });
+      } else {
+        console.log(`✔ There's no records in ${subscriberStatus}`);
+        eachCb();
+      }
     }, e => cb(e));
   },
 ], (e) => {
