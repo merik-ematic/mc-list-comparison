@@ -6,8 +6,9 @@
 ```
 npm install
 ```
-2. edit `promot-customer-selector.js` -> this is the file we maintain ourselves for customer API KEY list.
-3. run the script
+2. copy `.env.example` to `.env` and fillup details
+3. connect to VPN
+4. run the script
 ```
 node mc-export-stream.js [csvFilePath]
 ```
