@@ -87,7 +87,8 @@ waterfall([
       .pipe(parse({ skip_empty_lines: true, columns: true, trim: true }))
       .on('data', (data) => {
         const { email } = data;
-        const result = emailDb.by('email', email);
+        const loweredEmail = email.toLowerCase();
+        const result = emailDb.by('email', loweredEmail);
         const exists = exportDb.by('email', email);
         if (result) {
           // eslint-disable-next-line no-param-reassign
@@ -123,6 +124,7 @@ waterfall([
         fs.writeFile(savedFile, parser.parse(records), (e) => {
           eachCb(e);
         });
+        console.log(`✔ Exporting records in ${subscriberStatus} to csv`);
       } else {
         console.log(`✔ There's no records in ${subscriberStatus}`);
         eachCb();

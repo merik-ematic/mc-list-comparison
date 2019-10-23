@@ -1,9 +1,7 @@
 /* eslint-disable no-console */
-const fs = require('fs');
 const axios = require('axios');
 const dotent = require('dotenv');
 const prompts = require('prompts');
-const mysqlssh = require('mysql-ssh');
 const { Spinner } = require('cli-spinner');
 
 dotent.config();
@@ -21,31 +19,20 @@ module.exports = {
     const q = i.toLowerCase();
     return Promise.resolve(i.length ? c.filter(data => data.title.toLowerCase().includes(q)) : c);
   },
-  fetchCustomerFromDB: async () => {
+  fetchCustomerFromAPI: async () => {
     const spinner = new Spinner('Fetching customers...');
     spinner.start();
     const lists = [];
 
-    const dbCon = await mysqlssh.connect(
-      {
-        port: process.env.SSH_PORT,
-        host: process.env.SSH_HOST,
-        user: process.env.SSH_USER,
-        passphrase: process.env.SSH_KEY_PASS,
-        privateKey: fs.readFileSync(process.env.SSH_KEY_FILE),
+    const { data } = await axios.get(`${process.env.HI_IQ_V2_API_URL}/account`, {
+      headers: {
+        Authorization: `ematic-admin-apikey=${process.env.HI_IQ_V2_API_KEY}`,
       },
-      {
-        port: process.env.SSH_DB_PORT,
-        host: 'localhost',
-        user: process.env.SSH_DB_USER,
-        password: process.env.SSH_DB_PASS,
-        database: process.env.SSH_DB_DB,
-      },
-    );
+    });
 
-    const [results] = await dbCon.query('SELECT name, espAPIKey FROM `Accounts` WHERE active = 1 AND espName = "mailchimp"');
+    const accounts = data.account.filter(account => (account.espId === 1) && account.active);
 
-    results.forEach((item) => {
+    accounts.forEach((item) => {
       lists.push({
         title: item.name,
         value: {
@@ -55,7 +42,7 @@ module.exports = {
       });
     });
 
-    mysqlssh.close();
+    // mysqlssh.close();
     spinner.stop();
 
     return lists;
@@ -66,7 +53,7 @@ module.exports = {
       name: 'customer',
       limit: 0,
       message: 'Which customer?',
-      choices: module.exports.fetchCustomerFromDB,
+      choices: module.exports.fetchCustomerFromAPI,
       suggest: module.exports.searchTitle,
     },
     {
@@ -130,7 +117,7 @@ module.exports = {
       name: 'customer',
       limit: 0,
       message: 'Which customer?',
-      choices: module.exports.fetchCustomerFromDB,
+      choices: module.exports.fetchCustomerFromAPI,
       suggest: module.exports.searchTitle,
     },
     {
