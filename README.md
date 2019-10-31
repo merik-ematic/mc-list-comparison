@@ -4,7 +4,7 @@
 
 ### 1. Install Node.js and dependencies
     
-  You can download and install node.js from [Here](https://nodejs.org/en/download/), after installed switch to the tool folder and type:
+  You can download and install node.js from [here](https://nodejs.org/en/download/) and install at least nodejs 10 or above, after installed switch to the tool folder and type:
 
   ```
   npm install
