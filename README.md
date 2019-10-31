@@ -31,7 +31,7 @@
 
   [![asciicast](https://asciinema.org/a/zV3JiG58Mh3E1Rlvn67qqPsF6.svg)](https://asciinema.org/a/zV3JiG58Mh3E1Rlvn67qqPsF6)
 
-### 5. After finished, go ahead to the folder which your file is and you can see there's 5 additional files has been created.
+### 5. After finished, go ahead to the folder which your file is and you can see there's 5 additional files has been created maxmium.
 
   - FILNAME_new_results.csv
     - This file contains all the new emails that not in the list you compare with.
@@ -64,3 +64,5 @@
 
   #### For new/update subs
   You can update the existing users via `FILNAME_subscribed_results.csv` and go through the clean process for `FILNAME_new_results.csv`
+
+  
