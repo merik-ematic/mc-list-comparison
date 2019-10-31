@@ -23,6 +23,10 @@
 
 ### 3. Connect to VPN
 
+  **REMEMBER** to connect to VPN before you start using this tool.
+  
+  This tool will fetch all the account information via server.
+
 ### 4. Run the script
 
   ```
