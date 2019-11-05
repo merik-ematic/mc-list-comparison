@@ -6,6 +6,7 @@ const parse = require('csv-parse');
 const ndjson = require('ndjson');
 const request = require('request');
 const validator = require('validator');
+const removeBOM = require('remove-bom-stream');
 const { Parser } = require('json2csv');
 const { waterfall, each } = require('async');
 const { customerSelector } = require('./promot-customer-selector');
@@ -84,6 +85,7 @@ waterfall([
     console.log('✔ Parsing csv file & load into memory db...');
     const hrstartTs = process.hrtime();
     fs.createReadStream(filePath)
+      .pipe(removeBOM())
       .pipe(parse({ skip_empty_lines: true, columns: true, trim: true }))
       .on('data', (data) => {
         const { email } = data;
