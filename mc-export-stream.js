@@ -224,6 +224,7 @@ waterfall([
     }, (status) => status.type === 'PRE_VALIDATED' && status.percent >= 100, (e) => cb(e, data));
   },
   (dvResult, cb) => {
+    console.log('✔ DV Finished, ');
     const overallScore = dvResult.current_score;
     const totalCount = dvResult.subscriber_count;
     const uniqueCount = dvResult.distinct_subscriber_count;
@@ -233,7 +234,7 @@ waterfall([
     const gradeD = dvResult.grade_summary.D;
     const gradeF = dvResult.grade_summary.F;
     const percent = (grade) => ((grade / uniqueCount) * 100).toPrecision(4);
-    console.log(`✔ DV Finished, the score is: ${overallScore.toPrecision(4)} and ${totalCount} <=> ${uniqueCount} count.`);
+    console.log(`✔ The score is: ${overallScore.toPrecision(4)} and ${totalCount} <=> ${uniqueCount} count.`);
     console.log('✔ The grade summary is:');
     console.info({
       AA: `${percent(gradeAA)}%`,
