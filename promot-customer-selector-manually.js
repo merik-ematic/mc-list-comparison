@@ -1,10 +1,23 @@
 /* eslint-disable no-console */
+
+const _ = require('lodash');
 const axios = require('axios');
-const dotent = require('dotenv');
 const prompts = require('prompts');
 const { Spinner } = require('cli-spinner');
 
-dotent.config();
+const selectable = [
+  {
+    title: 'Account name here',
+    value: {
+      apikey: 'apikey here',
+    },
+  }, // Account name here
+];
+
+selectable.forEach((item) => {
+  // eslint-disable-next-line no-param-reassign
+  item.value.name = item.title;
+});
 
 const makeMailChimpRequester = (apikey) => axios.create({
   auth: {
@@ -19,41 +32,13 @@ module.exports = {
     const q = i.toLowerCase();
     return Promise.resolve(i.length ? c.filter((data) => data.title.toLowerCase().includes(q)) : c);
   },
-  fetchCustomerFromAPI: async () => {
-    const spinner = new Spinner('Fetching customers...');
-    spinner.start();
-    const lists = [];
-
-    const { data } = await axios.get(`${process.env.HI_IQ_V2_API_URL}/account`, {
-      headers: {
-        Authorization: `ematic-admin-apikey=${process.env.HI_IQ_V2_API_KEY}`,
-      },
-    });
-
-    const accounts = data.account.filter((account) => (account.espId === 1) && account.active);
-
-    accounts.forEach((item) => {
-      lists.push({
-        title: item.name,
-        value: {
-          name: item.name,
-          apikey: item.espAPIKey,
-        },
-      });
-    });
-
-    // mysqlssh.close();
-    spinner.stop();
-
-    return lists;
-  },
   customerSelector: async (skipConfirm) => prompts([
     {
       type: 'autocomplete',
       name: 'customer',
       limit: 0,
       message: 'Which customer?',
-      choices: module.exports.fetchCustomerFromAPI,
+      choices: selectable,
       suggest: module.exports.searchTitle,
     },
     {
@@ -88,7 +73,7 @@ module.exports = {
           process.exit(-1);
         }
 
-        data.lists.forEach((list) => {
+        _.each(data.lists, (list) => {
           lists.push({
             title: list.name,
             value: {
@@ -117,7 +102,7 @@ module.exports = {
       name: 'customer',
       limit: 0,
       message: 'Which customer?',
-      choices: module.exports.fetchCustomerFromAPI,
+      choices: selectable,
       suggest: module.exports.searchTitle,
     },
     {
