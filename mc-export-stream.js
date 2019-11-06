@@ -11,6 +11,7 @@ const prompts = require('prompts');
 const readline = require('readline');
 const validator = require('validator');
 const removeBOM = require('remove-bom-stream');
+const emailParser = require('email-addresses');
 const { Parser } = require('json2csv');
 const { waterfall, each, doUntil } = require('async');
 const { customerSelector } = require('./promot-customer-selector');
@@ -30,6 +31,7 @@ if (typeof filePath === 'undefined') {
 const statusList = ['subscribed', 'unsubscribed', 'cleaned'].reverse();
 
 const db = new Loki('mc-export-stream.db');
+const hostDb = new Loki('ematic-blacklist-domain.db');
 const emailDb = db.addCollection('emails', {
   unique: ['email'],
   autoupdate: true,
@@ -42,7 +44,22 @@ const exportDb = db.addCollection('exports', {
 
 const sleep = (time) => new Promise((resolve) => setTimeout(resolve, time));
 
+let blackHostDb;
+
 waterfall([
+  (cb) => {
+    hostDb.loadDatabase({}, () => {
+      blackHostDb = hostDb.getCollection('hosts');
+      if (blackHostDb === null) {
+        console.log('No blacklist host');
+        blackHostDb = hostDb.addCollection('hosts', {
+          unique: ['host'],
+          autoupdate: true,
+        });
+      }
+      cb();
+    });
+  },
   async () => {
     const clientData = await customerSelector();
 
@@ -71,7 +88,7 @@ waterfall([
         {
           type: 'select',
           name: 'emailIndex',
-          message: 'Which contains Email field?',
+          message: 'Which header represent Email column?',
           choices: () => {
             const payload = [];
             columns.forEach((title, index) => {
@@ -131,8 +148,15 @@ waterfall([
           // eslint-disable-next-line no-param-reassign
           data.subscriberStatus = result.status;
         } else {
+          let status = validator.isEmail(email) ? 'new' : 'fail';
+          if (status === 'new') {
+            const { domain } = emailParser.parseOneAddress(email);
+            if (blackHostDb.by('host', domain)) {
+              status = 'blacklist';
+            }
+          }
           // eslint-disable-next-line no-param-reassign
-          data.subscriberStatus = validator.isEmail(email) ? 'new' : 'fail';
+          data.subscriberStatus = status;
         }
         if (exists) {
           exists.subscriberStatus = data.subscriberStatus;
@@ -153,7 +177,7 @@ waterfall([
     let newFilePath = '';
     const filterStatus = JSON.parse(JSON.stringify(statusList));
     console.info('✔ Exporting csv');
-    filterStatus.push('new', 'fail');
+    filterStatus.push('new', 'fail', 'blacklist');
     const parser = new Parser();
     each(filterStatus, (subscriberStatus, eachCb) => {
       const records = exportDb.chain().find({ subscriberStatus }).data({ removeMeta: true });
@@ -221,7 +245,7 @@ waterfall([
         type: data.status_value,
         percent: data.status_percent_complete,
       };
-    }, (status) => status.type === 'PRE_VALIDATED' && status.percent >= 100, (e) => cb(e, data));
+    }, (status) => status.type === 'PRE_VALIDATED' && status.percent >= 100, (e) => process.stdout.write('\n') && cb(e, data));
   },
   (dvResult, cb) => {
     console.log('✔ DV Finished, ');
@@ -234,7 +258,7 @@ waterfall([
     const gradeD = dvResult.grade_summary.D;
     const gradeF = dvResult.grade_summary.F;
     const percent = (grade) => ((grade / uniqueCount) * 100).toPrecision(4);
-    console.log(`✔ The score is: ${overallScore.toPrecision(4)} and ${totalCount} <=> ${uniqueCount} count.`);
+    console.log(`✔ The score is: ${overallScore.toPrecision(4)}. and total ${totalCount} <=> unique ${uniqueCount} count.`);
     console.log('✔ The grade summary is:');
     console.info({
       AA: `${percent(gradeAA)}%`,
