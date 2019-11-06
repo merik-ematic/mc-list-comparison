@@ -2,6 +2,10 @@
 
 ## Usage: (in the terminal)
 
+### 0. After you pull this repo. if your're updating this program
+
+  we will suggest you delete the `node_modules` folder and `npm install` again to align dependencies version.
+
 ### 1. Install Node.js and dependencies
     
   You can download and install node.js from [here](https://nodejs.org/en/download/) and install at least nodejs 10 or above, after installed switch to the tool folder and type:
