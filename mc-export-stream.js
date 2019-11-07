@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 const fs = require('fs');
+const rp = require('request-promise');
 const path = require('path');
 const Loki = require('lokijs');
 const axios = require('axios');
@@ -7,13 +8,19 @@ const parse = require('csv-parse');
 const dotent = require('dotenv');
 const ndjson = require('ndjson');
 const request = require('request');
+const cheerio = require('cheerio');
 const prompts = require('prompts');
 const readline = require('readline');
 const validator = require('validator');
 const removeBOM = require('remove-bom-stream');
 const emailParser = require('email-addresses');
 const { Parser } = require('json2csv');
-const { waterfall, each, doUntil } = require('async');
+const {
+  waterfall,
+  each,
+  doUntil,
+  parallel,
+} = require('async');
 const { customerSelector } = require('./promot-customer-selector');
 // const { customerSelector } = require('./promot-customer-selector-manually');
 
@@ -43,6 +50,8 @@ const exportDb = db.addCollection('exports', {
 });
 
 const sleep = (time) => new Promise((resolve) => setTimeout(resolve, time));
+
+const cookieJar = rp.jar();
 
 let blackHostDb;
 
@@ -193,6 +202,109 @@ waterfall([
         eachCb();
       }
     }, (e) => cb(e, emailField, newFilePath));
+  },
+  (emailField, newFilePath, cb) => {
+    waterfall([
+      async () => {
+        const dom = await rp({
+          url: 'https://cse.ematicsolutions.com/login',
+          jar: cookieJar,
+          transform: (body) => cheerio.load(body),
+        });
+        return dom('input[name="_token"]').attr('value');
+      },
+      async (token) => {
+        const loggedRsp = await rp({
+          resolveWithFullResponse: true,
+          followAllRedirects: true,
+          method: 'POST',
+          jar: cookieJar,
+          uri: 'https://cse.ematicsolutions.com/login',
+          form: {
+            _token: token,
+            email: process.env.CSE_TOOL_USERNAME,
+            password: process.env.CSE_TOOL_PASSWORD,
+          },
+        });
+        const isLogged = loggedRsp.request.uri.href === 'https://cse.ematicsolutions.com/';
+        console.log(`✔ CSE tool login ${isLogged ? 'succeeded' : 'failed'}`);
+        if (!isLogged) throw new Error('CSE tool login failed');
+      },
+      async () => {
+        const loggedDom = await rp({
+          url: 'https://cse.ematicsolutions.com/cleaned-emails-scan/create',
+          jar: cookieJar,
+          transform: (body) => cheerio.load(body),
+        });
+        return loggedDom('input[name="_token"]').attr('value');
+      },
+      async (cesToken) => {
+        const formData = {
+          csv_file: fs.createReadStream(newFilePath),
+          _token: cesToken,
+          email_column_ordinal: emailField.index + 1,
+          header_row: 1,
+        };
+        const cesRsp = await rp({
+          resolveWithFullResponse: true,
+          followAllRedirects: true,
+          method: 'POST',
+          jar: cookieJar,
+          uri: 'https://cse.ematicsolutions.com/cleaned-emails-scan',
+          formData,
+        });
+
+        console.log(`✔ CSE cleaned emails scan created: ${cesRsp.request.uri.href}`);
+
+        return cesRsp.request.uri.href;
+      },
+      (taskUrl, wcb) => {
+        doUntil(async () => {
+          const data = await rp({
+            jar: cookieJar,
+            uri: `${taskUrl}/status`,
+            json: true,
+          });
+          process.stdout.clearLine();
+          process.stdout.cursorTo(0);
+          process.stdout.write(`✔ Clean processed: ${data.progress}%...`);
+          await sleep(3000);
+          return data;
+        }, (data) => parseInt(data.progress, 10) >= 100, (e) => process.stdout.write('\n') && wcb(e, taskUrl));
+      },
+      (taskUrl, wcb) => {
+        const cleanUrl = `${taskUrl}/download/output`;
+        const cleanedUrl = `${taskUrl}/download/cleaned`;
+        console.log('✔ Clean finished, downloading results...');
+        parallel([
+          async () => {
+            const cleanData = await rp({
+              jar: cookieJar,
+              uri: cleanUrl,
+            });
+            return cleanData;
+          },
+          async () => {
+            const cleanedData = await rp({
+              jar: cookieJar,
+              uri: cleanedUrl,
+            });
+            return cleanedData;
+          },
+        // eslint-disable-next-line no-shadow
+        ], (e, [cleanData, cleanedData]) => {
+          if (e) wcb(e);
+          const cleanFileName = path.basename(newFilePath, path.extname(newFilePath));
+          const cleanFileLocation = path.dirname(newFilePath);
+          fs.writeFileSync(`${cleanFileLocation}/${cleanFileName}_out.csv`, cleanData);
+          fs.writeFileSync(`${cleanFileLocation}/${cleanFileName}_cleaned.csv`, cleanedData);
+          // eslint-disable-next-line no-param-reassign
+          newFilePath = `${cleanFileLocation}/${cleanFileName}_out.csv`;
+          console.log('✔ Clean results downloaded.');
+          wcb();
+        });
+      },
+    ], (e) => cb(e, emailField, newFilePath));
   },
   async (emailField, newFilePath) => {
     console.log('✔ Preparing DV the new subs...');

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - future branch
 ### ADD
 - Compare with our blacklist too
+- Connect to CSE tools, after compared the list, we well handle cleaned scan and download the result for you.
 - Connect to DataValidation API, right now we can also do DV in this tool right away. we will handle it for you.
 ### Changed
 - Remove hard limitation for Email header name, now we can select which hader represent Email column.
