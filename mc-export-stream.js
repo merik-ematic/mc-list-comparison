@@ -11,6 +11,7 @@ const request = require('request');
 const cheerio = require('cheerio');
 const prompts = require('prompts');
 const readline = require('readline');
+const stripBom = require('strip-bom');
 const validator = require('validator');
 const removeBOM = require('remove-bom-stream');
 const emailParser = require('email-addresses');
@@ -89,7 +90,7 @@ waterfall([
     const rl = readline.createInterface(fs.createReadStream(filePath));
     let columns = [];
     rl.on('line', (line) => {
-      columns = line.split(',');
+      columns = stripBom(line).split(',');
       rl.close();
     });
     rl.on('close', async () => {
