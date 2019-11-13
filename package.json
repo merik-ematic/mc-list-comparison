@@ -22,7 +22,7 @@
     "lodash": "^4.17.15",
     "lokijs": "^1.5.7",
     "ndjson": "^1.5.0",
-    "prompts": "^2.2.1",
+    "prompts": "^2.3.0",
     "remove-bom-stream": "^1.2.0",
     "request": "^2.88.0",
     "request-promise": "^4.2.5",
