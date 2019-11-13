@@ -1,5 +1,11 @@
 # Mailchimp list comparison tool
 
+## !! Read before use !!
+
+  We should make sure every file comes with UTF-8 (even with BOM), if not, please convert to UTF-8 before start using this tool.
+
+---
+
 ## Usage: (in the terminal)
 
 ### 0. After you pull this repo. if your're updating this program
