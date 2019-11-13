@@ -5,6 +5,7 @@ const path = require('path');
 const Loki = require('lokijs');
 const axios = require('axios');
 const parse = require('csv-parse');
+const crypto = require('crypto');
 const dotent = require('dotenv');
 const ndjson = require('ndjson');
 const request = require('request');
@@ -22,8 +23,8 @@ const {
   doUntil,
   parallel,
 } = require('async');
-const { customerSelector } = require('./promot-customer-selector');
 // const { customerSelector } = require('./promot-customer-selector-manually');
+const { customerSelector } = require('./promot-customer-selector');
 
 const filePath = process.argv[2];
 const fileName = path.basename(filePath, path.extname(filePath));
@@ -46,7 +47,7 @@ const emailDb = db.addCollection('emails', {
 });
 const exportDb = db.addCollection('exports', {
   unique: ['email'],
-  indices: ['subscriberStatus'],
+  indices: ['subscriberStatusByEmaticTool'],
   autoupdate: true,
 });
 
@@ -98,7 +99,7 @@ waterfall([
         {
           type: 'select',
           name: 'emailIndex',
-          message: 'Which header represent Email column?',
+          message: 'Which contains Email field?',
           choices: () => {
             const payload = [];
             columns.forEach((title, index) => {
@@ -114,6 +115,7 @@ waterfall([
   },
   ({ apikey, listId, endpoint }, emailField, cb) => {
     const endpointUrl = new URL(endpoint);
+    endpointUrl.searchParams.set('hashed', 'sha256');
     endpointUrl.searchParams.set('apikey', apikey);
     endpointUrl.searchParams.set('id', listId);
     cb(null, endpointUrl, emailField);
@@ -123,11 +125,12 @@ waterfall([
       const hrstartTs = process.hrtime();
       url.searchParams.set('status', status);
       const endpoint = url.toString();
-      console.info(`✔ Importing status: ${status} => ${endpoint}`);
+      console.info(`✔ Importing status: ${status} users into memory DB`);
       request.get(endpoint)
         .pipe(ndjson.parse())
         .on('data', ([email]) => {
           if (email === 'Email Address') { return; }
+          if (email === 'EMAIL_HASH') { return; }
           emailDb.insert({ email, status });
         })
         .on('end', () => {
@@ -151,12 +154,16 @@ waterfall([
       .pipe(parse({ skip_empty_lines: true, columns: true, trim: true }))
       .on('data', (data) => {
         const email = data[emailField.name];
+        if (typeof email === 'undefined') {
+          console.log('X There\'s something wrong when parse the file... Please contact Merik to solve this.', data, emailField);
+          process.exit(-1);
+        }
         const loweredEmail = email.toLowerCase();
-        const result = emailDb.by('email', loweredEmail);
+        const result = emailDb.by('email', crypto.createHash('sha256').update(loweredEmail).digest('hex'));
         const exists = exportDb.by('email', email);
         if (result) {
           // eslint-disable-next-line no-param-reassign
-          data.subscriberStatus = result.status;
+          data.subscriberStatusByEmaticTool = result.status;
         } else {
           let status = validator.isEmail(email) ? 'new' : 'fail';
           if (status === 'new') {
@@ -166,10 +173,10 @@ waterfall([
             }
           }
           // eslint-disable-next-line no-param-reassign
-          data.subscriberStatus = status;
+          data.subscriberStatusByEmaticTool = status;
         }
         if (exists) {
-          exists.subscriberStatus = data.subscriberStatus;
+          exists.subscriberStatusByEmaticTool = data.subscriberStatusByEmaticTool;
         } else {
           exportDb.insert(data);
         }
@@ -190,7 +197,8 @@ waterfall([
     filterStatus.push('new', 'fail', 'blacklist');
     const parser = new Parser();
     each(filterStatus, (subscriberStatus, eachCb) => {
-      const records = exportDb.chain().find({ subscriberStatus }).data({ removeMeta: true });
+      const query = { subscriberStatusByEmaticTool: subscriberStatus };
+      const records = exportDb.chain().find(query).data({ removeMeta: true });
       if (records.length) {
         const savedFile = `${fileLocation}/${fileName}_${subscriberStatus}_results.csv`;
         fs.writeFile(savedFile, parser.parse(records), (e) => {
@@ -371,7 +379,7 @@ waterfall([
     const gradeD = dvResult.grade_summary.D;
     const gradeF = dvResult.grade_summary.F;
     const percent = (grade) => ((grade / uniqueCount) * 100).toPrecision(4);
-    console.log(`✔ The score is: ${overallScore.toPrecision(4)}. and total ${totalCount} <=> unique ${uniqueCount} count.`);
+    console.log(`✔ The score is: ${overallScore.toPrecision(4)} and ${totalCount} <=> ${uniqueCount} count.`);
     console.log('✔ The grade summary is:');
     console.info({
       AA: `${percent(gradeAA)}%`,
@@ -383,8 +391,5 @@ waterfall([
     cb();
   },
 ], (e) => {
-  if (e) {
-    console.log('errored');
-    throw e;
-  }
+  if (e) throw e;
 });
