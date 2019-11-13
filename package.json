@@ -4,7 +4,7 @@
   "description": "",
   "main": "mc-export-stream.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint --fix \"./**/*.js\"",
     "main": "node mc-export-stream.js"
   },
   "author": "Merik",
