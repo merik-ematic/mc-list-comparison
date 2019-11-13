@@ -1,5 +1,13 @@
 # Mailchimp list comparison tool
 
+  Released version:
+  
+  [![Build Status](https://travis-ci.com/merik-ematic/mc-list-comparison.svg?branch=master)](https://travis-ci.com/merik-ematic/mc-list-comparison)
+  
+  Alpha version:
+  
+  [![Build Status](https://travis-ci.com/merik-ematic/mc-list-comparison.svg?branch=future)](https://travis-ci.com/merik-ematic/mc-list-comparison)
+
 ## !! Read before use !!
 
   We should make sure every file comes with UTF-8 (even with BOM), if not, please convert to UTF-8 before start using this tool.
