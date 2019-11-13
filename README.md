@@ -18,7 +18,7 @@
 
 ### 0. After you pull this repo. if your're updating this program
 
-  we will suggest you delete the `node_modules` folder and `npm install` again to align dependencies version.
+ Please make sure you delete the `node_modules` folder and `npm install` again to align dependencies version before you using it.
 
 ### 1. Install Node.js and dependencies
     
