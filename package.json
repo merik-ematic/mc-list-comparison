@@ -4,26 +4,34 @@
   "description": "",
   "main": "mc-export-stream.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint --fix \"./**/*.js\"",
     "main": "node mc-export-stream.js"
   },
   "author": "Merik",
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "async": "^3.1.0",
+    "async": "^2.6.3",
     "axios": "^0.19.0",
+    "cheerio": "^1.0.0-rc.3",
     "cli-spinner": "^0.2.10",
     "csv-parse": "^4.6.3",
     "dotenv": "^8.2.0",
+    "email-addresses": "^3.1.0",
     "json2csv": "^4.5.4",
     "lodash": "^4.17.15",
     "lokijs": "^1.5.7",
-    "mysql-ssh": "https://github.com/merik-ematic/mysql-ssh.git",
     "ndjson": "^1.5.0",
     "prompts": "^2.2.1",
     "remove-bom-stream": "^1.2.0",
     "request": "^2.88.0",
+    "request-promise": "^4.2.5",
+    "strip-bom": "^4.0.0",
     "validator": "^11.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^6.6.0",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-plugin-import": "^2.18.2"
   }
 }
