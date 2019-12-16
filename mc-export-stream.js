@@ -115,7 +115,7 @@ waterfall([
   },
   ({ apikey, listId, endpoint }, emailField, cb) => {
     const endpointUrl = new URL(endpoint);
-    endpointUrl.searchParams.set('hashed', 'sha256');
+    // endpointUrl.searchParams.set('hashed', 'sha256');
     endpointUrl.searchParams.set('apikey', apikey);
     endpointUrl.searchParams.set('id', listId);
     cb(null, endpointUrl, emailField);
@@ -131,6 +131,7 @@ waterfall([
         .on('data', ([email]) => {
           if (email === 'Email Address') { return; }
           if (email === 'EMAIL_HASH') { return; }
+          email = email.toLowerCase();
           emailDb.insert({ email, status });
         })
         .on('end', () => {
@@ -159,7 +160,8 @@ waterfall([
           process.exit(-1);
         }
         const loweredEmail = email.toLowerCase();
-        const result = emailDb.by('email', crypto.createHash('sha256').update(loweredEmail).digest('hex'));
+
+        const result = emailDb.by('email', loweredEmail);
         const exists = exportDb.by('email', email);
         if (result) {
           // eslint-disable-next-line no-param-reassign
@@ -216,7 +218,7 @@ waterfall([
     waterfall([
       async () => {
         const dom = await rp({
-          url: 'https://cse.ematicsolutions.com/login',
+          url: 'https://cse-prod2.ematicsolutions.com/login',
           jar: cookieJar,
           transform: (body) => cheerio.load(body),
         });
@@ -228,20 +230,20 @@ waterfall([
           followAllRedirects: true,
           method: 'POST',
           jar: cookieJar,
-          uri: 'https://cse.ematicsolutions.com/login',
+          uri: 'https://cse-prod2.ematicsolutions.com/login',
           form: {
             _token: token,
             email: process.env.CSE_TOOL_USERNAME,
             password: process.env.CSE_TOOL_PASSWORD,
           },
         });
-        const isLogged = loggedRsp.request.uri.href === 'https://cse.ematicsolutions.com/';
+        const isLogged = loggedRsp.request.uri.href === 'https://cse-prod2.ematicsolutions.com/home';
         console.log(`✔ CSE tool login ${isLogged ? 'succeeded' : 'failed'}`);
         if (!isLogged) throw new Error('CSE tool login failed');
       },
       async () => {
         const loggedDom = await rp({
-          url: 'https://cse.ematicsolutions.com/cleaned-emails-scan/create',
+          url: 'https://cse-prod2.ematicsolutions.com/cleaned-emails-scan/create',
           jar: cookieJar,
           transform: (body) => cheerio.load(body),
         });
@@ -259,7 +261,7 @@ waterfall([
           followAllRedirects: true,
           method: 'POST',
           jar: cookieJar,
-          uri: 'https://cse.ematicsolutions.com/cleaned-emails-scan',
+          uri: 'https://cse-prod2.ematicsolutions.com/cleaned-emails-scan',
           formData,
         });
 
