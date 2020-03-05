@@ -5,7 +5,6 @@ const path = require('path');
 const Loki = require('lokijs');
 const axios = require('axios');
 const parse = require('csv-parse');
-const crypto = require('crypto');
 const dotent = require('dotenv');
 const ndjson = require('ndjson');
 const request = require('request');
@@ -56,6 +55,10 @@ const sleep = (time) => new Promise((resolve) => setTimeout(resolve, time));
 const cookieJar = rp.jar();
 
 let blackHostDb;
+
+emailDb.on('error', (error) => {
+  if (error) console.log(error);
+});
 
 waterfall([
   (cb) => {
@@ -110,15 +113,47 @@ waterfall([
           },
         },
       ]);
-      cb(null, api, emailIndex);
+      cb(null, api, { file: emailIndex });
     });
   },
   ({ apikey, listId, endpoint }, emailField, cb) => {
     const endpointUrl = new URL(endpoint);
-    // endpointUrl.searchParams.set('hashed', 'sha256');
     endpointUrl.searchParams.set('apikey', apikey);
     endpointUrl.searchParams.set('id', listId);
     cb(null, endpointUrl, emailField);
+  },
+  (endpointUrl, { file }, cb) => {
+    const emailField = { file };
+    endpointUrl.searchParams.set('since', '2070-12-31 23:59:59');
+    const r = request.get(endpointUrl.toString(), async (error, response, body) => {
+      if (error) {
+        cb(error);
+      } else {
+        const columns = JSON.parse(body);
+        const { emailIndex } = await prompts([
+          {
+            type: 'select',
+            name: 'emailIndex',
+            message: 'Which contains Email field in MC list?',
+            choices: () => {
+              const payload = [];
+              columns.forEach((title, index) => {
+                payload.push({ title, value: { name: title, index } });
+              });
+              return payload;
+            },
+          },
+        ]);
+        emailField.remote = emailIndex;
+        endpointUrl.searchParams.delete('since');
+        cb(null, endpointUrl, emailField);
+      }
+    });
+    r.on('response', (response) => {
+      if (typeof response.headers['x-mailchimp-api-error-code'] !== 'undefined') {
+        cb(Error('MailChimp not respond correctly.'));
+      }
+    });
   },
   (url, emailField, cb) => {
     each(statusList, (status, eachCb) => {
@@ -126,12 +161,22 @@ waterfall([
       url.searchParams.set('status', status);
       const endpoint = url.toString();
       console.info(`✔ Importing status: ${status} users into memory DB`);
-      request.get(endpoint)
-        .pipe(ndjson.parse())
-        .on('data', ([email]) => {
-          if (email === 'Email Address') { return; }
-          if (email === 'EMAIL_HASH') { return; }
-          email = email.toLowerCase();
+      const r = request.get(endpoint);
+      r.on('response', (response) => {
+        if (typeof response.headers['x-mailchimp-api-error-code'] !== 'undefined') {
+          throw new Error('MailChimp not respond correctly.');
+        }
+      });
+      r.pipe(ndjson.parse())
+        .on('data', (row) => {
+          const rawEmail = row[emailField.remote.index];
+          if ([
+            'Email Address',
+            'EMAIL_HASH',
+            'email', 'Email',
+            emailField.remote.name,
+          ].includes(rawEmail)) { return; }
+          const email = rawEmail.toLowerCase();
           emailDb.insert({ email, status });
         })
         .on('end', () => {
@@ -154,7 +199,7 @@ waterfall([
       .pipe(removeBOM())
       .pipe(parse({ skip_empty_lines: true, columns: true, trim: true }))
       .on('data', (data) => {
-        const email = data[emailField.name];
+        const email = data[emailField.file.name];
         if (typeof email === 'undefined') {
           console.log('X There\'s something wrong when parse the file... Please contact Merik to solve this.', data, emailField);
           process.exit(-1);
@@ -253,7 +298,7 @@ waterfall([
         const formData = {
           csv_file: fs.createReadStream(newFilePath),
           _token: cesToken,
-          email_column_ordinal: emailField.index + 1,
+          email_column_ordinal: emailField.file.index + 1,
           header_row: 1,
         };
         const cesRsp = await rp({
@@ -329,7 +374,7 @@ waterfall([
     const rsp = await dvApiInstence.get('create_upload_url', {
       params: {
         name: dvFileName,
-        email_column_index: emailField.index,
+        email_column_index: emailField.file.index,
         has_header: 1,
         start_validation: 'false',
       },
@@ -383,8 +428,8 @@ waterfall([
     const percent = (grade) => ((grade / uniqueCount) * 100).toPrecision(4);
     console.log(`✔ The score is: ${overallScore.toPrecision(4)} and ${totalCount} <=> ${uniqueCount} count.`);
     console.log('✔ The grade summary is:');
-    console.info({
-      AA: `${percent(gradeAA)}%`,
+    console.table({
+      'A+': `${percent(gradeAA)}%`,
       A: `${percent(gradeA)}%`,
       B: `${percent(gradeB)}%`,
       D: `${percent(gradeD)}%`,

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - future branch
 
+## [1.5.1] - 2020-03-05
+### Changed
+- Now we can select which field contains in MC list (resolved the email column is not always the first column issue).
+- DV summary changed to console.table function.
+
 ## [1.4.3] - 2019-11-13
 ### ADD
 - Compare with our blacklist too
